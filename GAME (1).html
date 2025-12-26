@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>마리오풍 점프 게임 - 가이드 복원 버전</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{
+      --sky:#87ceeb;
+      --ground:#6b4f2d;
+      --platform:#8b6b3c;
+      --platform-top:#b98a4a;
+      --player-body:#2b6cb0;
+      --player-face:#f1c27d;
+      --enemy:#e11d48;
+      --coin:#ffd54a;
+      --potion:#ff7fbf;
+      --hud-bg:rgba(0,0,0,0.35);
+      --guide-bg: rgba(0,0,0,0.45);
+      --text:#fff;
+      --outline: rgba(0,0,0,0.18);
+    }
+    html,body{height:100%;margin:0;}
+    body{
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
+      background:var(--sky);
+      font-family:system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", sans-serif;
+      color:var(--text);
+      overflow:hidden;
+      padding-top:12px;
+    }
+    canvas{
+      background:linear-gradient(var(--sky), #bde0fe);
+      border:3px solid #2a3154;
+      display:block;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.25);
+      margin-top:120px; /* 아래 가이드 공간 확보 */
+    }
+    #hud{
+      position:fixed;
+      top:12px;
+      left:50%;
+      transform:translateX(-50%);
+      display:flex;
+      gap:18px;
+      padding:8px 12px;
+      background:var(--hud-bg);
+      border-radius:10px;
+      font-weight:700;
+      text-shadow:1px 1px 2px rgba(0,0,0,0.4);
+      pointer-events:none;
+      z-index:50;
+    }
+    #gameGuide{
+      position:fixed;
+      top:64px;
+      left:50%;
+      transform:translateX(-50%);
+      width: min(920px, 94%);
+      background: var(--guide-bg);
+      color: #fff;
+      padding:10px 14px;
+      border-radius:10px;
+      font-size:14px;
+      line-height:1.4;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+      z-index:50;
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .guide-left { display:flex; gap:12px; align-items:center; }
+    .guide-item { display:flex; gap:8px; align-items:center; }
+    .guide-icon { width:36px; height:36px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; font-weight:700; color:#111; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }
+    .icon-coin { background: var(--coin); }
+    .icon-potion { background: var(--potion); }
+    .icon-stomp { background: var(--enemy); color:#fff; }
+    .icon-note { background: #fff; color:#111; border-radius:50%; width:28px; height:28px; font-size:14px; }
+    .guide-right { font-size:13px; color:#f0f0f0; text-align:right; min-width:260px; }
+    #info{
+      position:fixed;
+      bottom:12px;
+      left:50%;
+      transform:translateX(-50%);
+      background:var(--hud-bg);
+      padding:8px 12px;
+      border-radius:8px;
+      font-size:13px;
+      color:#eee;
+      pointer-events:none;
+      z-index:50;
+    }
+    #restartBtn{
+      position:fixed;
+      top:50%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      padding:10px 18px;
+      font-size:18px;
+      border-radius:8px;
+      border:2px solid #2a3154;
+      background:#1a2038;
+      color:#fff;
+      cursor:pointer;
+      display:none;
+      z-index:60;
+    }
+    #restartBtn:hover{background:#222a4a;}
+    #stageFlash {
+      position:fixed;
+      top:40%;
+      left:50%;
+      transform:translate(-50%,-50%);
+      font-size:48px;
+      font-weight:800;
+      color:#fff;
+      text-shadow: 0 6px 18px rgba(0,0,0,0.6);
+      pointer-events:none;
+      z-index:70;
+      opacity:0;
+    }
+    @media (max-width:900px){
+      canvas { width: 92vw; height: 61.5vw; margin-top:140px; }
+      #gameGuide { font-size:13px; padding:8px; gap:8px; }
+      .guide-icon { width:30px; height:30px; }
+      #stageFlash { font-size:32px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="hud">
+    <div id="score">Score: 0</div>
+    <div id="lives">❤️❤️❤️❤️</div>
+    <div id="stage">Stage: 1</div>
+    <div id="next">Next: 150</div>
+  </div>
+
+  <!-- 가이드 패널: 조작법 + 아이템/점수 규칙 -->
+  <div id="gameGuide" role="region" aria-label="게임 가이드">
+    <div class="guide-left">
+      <div class="guide-item">
+        <div class="guide-icon icon-coin">C</div>
+        <div><strong>코인</strong> : 닿으면 <strong>+20점</strong> (근접 자동 획득)</div>
+      </div>
+      <div class="guide-item">
+        <div class="guide-icon icon-potion">P</div>
+        <div><strong>물약(체력)</strong> : 닿으면 <strong>체력 +1</strong> (최대 6)</div>
+      </div>
+      <div class="guide-item">
+        <div class="guide-icon icon-stomp">S</div>
+        <div><strong>적 밟기</strong> : 위에서 밟으면 <strong>적 처치 +50점</strong></div>
+      </div>
+    </div>
+
+    <div class="guide-right">
+      <div><strong>조작</strong> : 이동 ← → 또는 A/D · 점프 Space / ↑ · 일시정지 P</div>
+      <div style="margin-top:6px; font-size:13px; opacity:0.95;">충돌 시 체력 -1 · 충돌 후 1초 무적</div>
+    </div>
+  </div>
+
+  <div id="stageInfo">스테이지별 목표: 코인/적 처치로 점수 획득. 물약으로 체력 회복.</div>
+  <div id="stageFlash" aria-hidden="true"></div>
+
+  <button id="restartBtn">게임 재시작</button>
+  <canvas id="gameCanvas" width="1000" height="650" tabindex="0" aria-label="게임 캔버스"></canvas>
+
+  <script>
+  // ====== 게임 코드 (가이드 복원 포함) ======
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const livesEl = document.getElementById('lives');
+  const stageEl = document.getElementById('stage');
+  const nextEl = document.getElementById('next');
+  const stageInfoEl = document.getElementById('stageInfo');
+  const stageFlash = document.getElementById('stageFlash');
+  const restartBtn = document.getElementById('restartBtn');
+
+  function resizeCanvas() {
+    const w = Math.max(800, Math.floor(window.innerWidth * 0.85));
+    const h = Math.max(600, Math.floor(window.innerHeight * 0.75));
+    canvas.width = w;
+    canvas.height = h;
+    layoutStage();
+  }
+  window.addEventListener('resize', resizeCanvas);
+
+  const gravity = 0.6;
+  const groundHeight = 80;
+  const maxFallSpeed = 14;
+
+  let score = 0;
+  let lives = 4;
+  let stage = 1;
+  let paused = false;
+  let gameOver = false;
+
+  // 적 스폰
+  let spawnTimer = 0;
+  let spawnInterval = 6.0;
+  const minSpawnInterval = 1.6;
+  const spawnEnabled = true;
+
+  const keys = {};
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowLeft','ArrowRight','ArrowUp','Space'].includes(e.code)) e.preventDefault();
+    keys[e.code] = true;
+    if (e.code === 'KeyP') paused = !paused;
+    canvas.focus();
+  }, { passive: false });
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const rectOverlap = (A, B) => A.x < B.x + B.w && A.x + A.w > B.x && A.y < B.y + B.h && A.y + A.h > B.y;
+
+  function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+    if (typeof r === 'undefined') r = 5;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+    if (fill) ctx.fill();
+    if (stroke) ctx.stroke();
+  }
+
+  // 엔티티들 (Player/Platform/Coin/Potion/Enemy)
+  class Player {
+    constructor(x,y){
+      this.x = x; this.y = y;
+      this.w = 30; this.h = 40;
+      this.vx = 0; this.vy = 0;
+      this.speed = 4.2;
+      this.jumpPower = 13.0;
+      this.onGround = false;
+      this.prevBottom = y + this.h;
+      this.invincibleUntil = 0;
+      this.coyote = 0;
+      this.jumpBuffer = 0;
+    }
+    rect(){ return { x: this.x, y: this.y, w: this.w, h: this.h }; }
+    update(dt, platforms){
+      const left = keys['ArrowLeft'] || keys['KeyA'];
+      const right = keys['ArrowRight'] || keys['KeyD'];
+      const jump = keys['Space'] || keys['ArrowUp'];
+
+      this.vx = (right ? this.speed : 0) - (left ? this.speed : 0);
+
+      if (jump) this.jumpBuffer = 0.12;
+      else this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
+
+      this.coyote = Math.max(0, this.coyote - dt);
+
+      this.vy += gravity;
+      this.vy = clamp(this.vy, -999, maxFallSpeed);
+
+      this.prevBottom = this.y + this.h;
+
+      const prevX = this.x;
+      this.x += this.vx * dt * 60;
+      this.x = clamp(this.x, 0, canvas.width - this.w);
+
+      for (const p of platforms) {
+        const pr = p.rect();
+        const me = this.rect();
+        if (rectOverlap(me, pr)) {
+          const prevMe = { x: prevX, y: this.y, w: this.w, h: this.h };
+          if (!rectOverlap(prevMe, pr)) {
+            if (this.vx > 0) this.x = pr.x - this.w - 0.1;
+            else if (this.vx < 0) this.x = pr.x + pr.w + 0.1;
+          }
+        }
+      }
+
+      this.y += this.vy * dt * 60;
+
+      const groundY = canvas.height - groundHeight;
+      if (this.y + this.h >= groundY) {
+        if (!this.onGround) this.coyote = 0.12;
+        this.y = groundY - this.h;
+        this.vy = 0;
+        this.onGround = true;
+      } else {
+        this.onGround = false;
+      }
+
+      for (const p of platforms) {
+        const pr = p.rect();
+        const prevBottom = this.prevBottom;
+        const nowBottom = this.y + this.h;
+        const withinX = this.x + this.w > pr.x && this.x < pr.x + pr.w;
+        if (withinX && this.vy >= 0 && prevBottom <= pr.y + 6 && nowBottom >= pr.y) {
+          this.y = pr.y - this.h;
+          this.vy = 0;
+          this.onGround = true;
+          this.coyote = 0.12;
+        }
+      }
+
+      if (this.jumpBuffer > 0 && (this.onGround || this.coyote > 0)) {
+        this.vy = -this.jumpPower;
+        this.onGround = false;
+        this.coyote = 0;
+        this.jumpBuffer = 0;
+      }
+    }
+    draw(){
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(this.x+2, this.y+this.h+4, this.w, 6);
+      ctx.fillStyle = 'var(--player-body)';
+      roundRect(ctx, this.x, this.y, this.w, this.h, 6, true, false);
+      ctx.fillStyle = 'var(--player-face)';
+      ctx.beginPath();
+      ctx.arc(this.x + this.w/2, this.y + 8, 8, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = '#111';
+      ctx.fillRect(this.x + this.w/2 - 6, this.y + 6, 3, 3);
+      ctx.fillRect(this.x + this.w/2 + 3, this.y + 6, 3, 3);
+      ctx.fillStyle = 'var(--player-hat)';
+      ctx.fillRect(this.x + 4, this.y - 6, this.w - 8, 6);
+      ctx.strokeStyle = 'var(--outline)';
+      ctx.strokeRect(this.x, this.y, this.w, this.h);
+    }
+  }
+
+  class Platform {
+    constructor(x,y,w,h){ this.x=x; this.y=y; this.w=w; this.h=h; }
+    rect(){ return {x:this.x, y:this.y, w:this.w, h:this.h}; }
+    draw(){
+      ctx.fillStyle = 'rgba(0,0,0,0.08)';
+      ctx.fillRect(this.x+4, this.y+6, this.w, 6);
+      ctx.fillStyle = 'var(--platform)';
+      roundRect(ctx, this.x, this.y, this.w, this.h, 6, true, false);
+      ctx.fillStyle = 'var(--platform-top)';
+      ctx.fillRect(this.x, this.y, this.w, 4);
+      ctx.strokeStyle = 'var(--outline)';
+      ctx.strokeRect(this.x, this.y, this.w, this.h);
+    }
+  }
+
+  class Coin {
+    constructor(x,y){ this.x=x; this.y=y; this.r=10; this.active=true; this.pickupRadius = 40; }
+    rect(){ return {x:this.x-this.r, y:this.y-this.r, w:this.r*2, h:this.r*2}; }
+    draw(){
+      if(!this.active) return;
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.beginPath();
+      ctx.ellipse(this.x+3, this.y+8, this.r, this.r/2, 0, 0, Math.PI*2);
+      ctx.fill();
+      ctx.fillStyle = 'var(--coin)';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI*2);
+      ctx.fill();
+      ctx.strokeStyle = '#e0a800';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  class Potion {
+    constructor(x,y){ this.x=x; this.y=y; this.w=14; this.h=18; this.active=true; this.pickupRadius = 40; }
+    rect(){ return {x:this.x-this.w/2, y:this.y-this.h, w:this.w, h:this.h}; }
+    draw(){
+      if(!this.active) return;
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(this.x-6, this.y+2, this.w+12, 6);
+      ctx.fillStyle = 'var(--potion)';
+      roundRect(ctx, this.x - this.w/2, this.y - this.h, this.w, this.h, 4, true, false);
+      ctx.strokeStyle = '#c04a7a';
+      ctx.strokeRect(this.x - this.w/2, this.y - this.h, this.w, this.h);
+    }
+  }
+
+  class Enemy {
+    constructor(x,y,type='walker'){ 
+      this.x=x; this.y=y; this.w=28; this.h=22; 
+      this.type=type; this.dir=1; this.speed=0.9; this.vy=0; this.active=true; 
+      this.baseX=x; this.range=80; this.phase=Math.random()*Math.PI*2; 
+      this.detectRange = 220;
+    }
+    rect(){ return {x:this.x, y:this.y, w:this.w, h:this.h}; }
+    update(dt, player){
+      if(!this.active) return;
+      if(this.type === 'walker'){
+        this.x += this.dir * this.speed * dt * 60;
+        if(this.x < this.baseX - this.range) this.dir = 1;
+        if(this.x > this.baseX + this.range) this.dir = -1;
+      } else if(this.type === 'jumper'){
+        this.vy += gravity;
+        this.y += this.vy * dt * 60;
+        if (!this._cooldown) this._cooldown = 0.0;
+        this._cooldown -= dt;
+        if (this._cooldown <= 0) { this.vy = -8.0; this._cooldown = 1.6 + Math.random()*1.2; }
+        const groundY = canvas.height - groundHeight;
+        if(this.y + this.h >= groundY){ this.y = groundY - this.h; this.vy = 0; }
+      } else if(this.type === 'floater'){
+        this.x += this.dir * this.speed * 0.6 * dt * 60;
+        if(this.x < this.baseX - this.range) this.dir = 1;
+        if(this.x > this.baseX + this.range) this.dir = -1;
+        this.y += Math.sin((performance.now()*0.002) + this.phase) * 0.4;
+      } else if(this.type === 'chaser'){
+        const dx = player.x - this.x;
+        const dy = player.y - this.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < this.detectRange){
+          this.x += Math.sign(dx) * this.speed * 1.4 * dt * 60;
+          if (Math.abs(dx) < 60 && player.vy < 0 && this.y + this.h >= player.y + player.h - 6) {
+            this.vy = -6;
+          }
+        } else {
+          this.x += this.dir * this.speed * dt * 60;
+        }
+        if(this.x < 0) this.x = 0;
+        if(this.x + this.w > canvas.width) this.x = canvas.width - this.w;
+      }
+    }
+    draw(){
+      if(!this.active) return;
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(this.x+2, this.y+this.h+4, this.w, 6);
+      ctx.fillStyle = 'var(--enemy)';
+      roundRect(ctx, this.x, this.y, this.w, this.h, 6, true, false);
+      ctx.strokeStyle = 'var(--outline)';
+      ctx.strokeRect(this.x, this.y, this.w, this.h);
+      ctx.fillStyle = '#fff';
+      ctx.font = '10px system-ui';
+      ctx.fillText(this.type[0].toUpperCase(), this.x + 6, this.y + 14);
+    }
+  }
+
+  // 게임 오브젝트
+  let player;
+  let platforms = [];
+  let coins = [];
+  let items = [];
+  let enemies = [];
+
+  // 스테이지 레이아웃 및 스폰 설정
+  function layoutStage(){
+    const w = canvas.width, h = canvas.height;
+    const baseY = h - groundHeight - 100;
+    platforms = []; coins = []; items = []; enemies = [];
+
+    platforms.push(new Platform(Math.max(60, w*0.08), baseY, 180, 18));
+    platforms.push(new Platform(Math.max(60, w*0.38), baseY - 70, 200, 18));
+    platforms.push(new Platform(Math.max(60, w*0.68), baseY - 20, 160, 18));
+
+    coins.push(new Coin(platforms[0].x + platforms[0].w/2, platforms[0].y - 12));
+    coins.push(new Coin(platforms[1].x + platforms[1].w/2, platforms[1].y - 12));
+    items.push(new Potion(platforms[2].x + 24, platforms[2].y - 6));
+
+    const baseEnemies = Math.min(1 + Math.floor(stage/2), 4);
+    for (let i=0;i<baseEnemies;i++){
+      const ex = Math.random() * (w - 160) + 80;
+      const types = ['walker','jumper','floater','chaser'];
+      const t = types[i % types.length];
+      const e = new Enemy(ex, h - groundHeight - 22, t);
+      e.baseX = ex;
+      e.range = 60 + Math.random()*120;
+      e.speed = 0.8 + (stage - 1) * 0.12;
+      enemies.push(e);
+    }
+
+    spawnInterval = Math.max(minSpawnInterval, 6.0 - (stage - 1) * 0.6);
+    spawnTimer = spawnInterval;
+
+    stageInfoEl.textContent = `스테이지 ${stage} — 목표: ${nextStageScore()}점. 조작법과 규칙은 상단 가이드를 확인하세요.`;
+  }
+
+  function nextStageScore() { return stage * 150; }
+
+  function spawnEnemy() {
+    const w = canvas.width, h = canvas.height;
+    const side = Math.random() < 0.5 ? 'left' : 'right';
+    const x = side === 'left' ? 40 + Math.random()*80 : w - 40 - Math.random()*80;
+    const types = ['walker','jumper','floater','chaser'];
+    const maxTypeIndex = Math.min(types.length - 1, Math.floor(stage / 2));
+    const t = types[Math.floor(Math.random() * (maxTypeIndex + 1))];
+    const e = new Enemy(x, h - groundHeight - 22, t);
+    e.baseX = x;
+    e.range = 60 + Math.random()*120;
+    e.speed = 0.8 + (stage - 1) * 0.12 + Math.random()*0.2;
+    enemies.push(e);
+  }
+
+  function updateHUD(){
+    scoreEl.textContent = 'Score: ' + score;
+    livesEl.textContent = '❤️'.repeat(Math.max(0, lives));
+    stageEl.textContent = 'Stage: ' + stage;
+    nextEl.textContent = 'Next: ' + nextStageScore();
+  }
+
+  function flashStageText(text) {
+    stageFlash.textContent = text;
+    stageFlash.style.transition = 'none';
+    stageFlash.style.opacity = '1';
+    stageFlash.style.transform = 'translate(-50%,-50%) scale(1.1)';
+    requestAnimationFrame(() => {
+      stageFlash.style.transition = 'opacity 0.9s ease, transform 0.9s ease';
+      stageFlash.style.opacity = '0';
+      stageFlash.style.transform = 'translate(-50%,-50%) scale(0.9)';
+    });
+  }
+
+  function initGame(){
+    resizeCanvas();
+    player = new Player(100, canvas.height - groundHeight - 48);
+    score = 0;
+    lives = 4;
+    stage = 1;
+    paused = false;
+    gameOver = false;
+    layoutStage();
+    updateHUD();
+    restartBtn.style.display = 'none';
+    for (const k in keys) keys[k] = false;
+  }
+
+  function handleCollisions(){
+    for (let i = enemies.length - 1; i >= 0; i--){
+      const e = enemies[i];
+      if (!e.active) continue;
+      if (rectOverlap(player.rect(), e.rect())){
+        const prevBottom = player.prevBottom ?? (player.y + player.h - player.vy);
+        const nowBottom = player.y + player.h;
+        const enemyTop = e.y;
+        const falling = player.vy > 0;
+        const stomp = falling && prevBottom <= enemyTop + 6 && nowBottom >= enemyTop;
+        if (stomp){
+          e.active = false;
+          enemies.splice(i,1);
+          player.vy = -player.jumpPower * 0.6;
+          score += 50;
+          updateHUD();
+        } else {
+          if (Date.now() > player.invincibleUntil){
+            player.invincibleUntil = Date.now() + 1000;
+            lives = Math.max(0, lives - 1);
+            updateHUD();
+            player.vy = -8;
+            player.x += (player.x < e.x ? -1 : 1) * 12;
+            player.x = clamp(player.x, 0, canvas.width - player.w);
+            if (lives <= 0){
+              gameOver = true;
+              restartBtn.style.display = 'block';
+            }
+          }
+        }
+      }
+    }
+
+    for (let i = coins.length - 1; i >= 0; i--){
+      const c = coins[i];
+      if (!c.active) continue;
+      const px = player.x + player.w/2;
+      const py = player.y + player.h/2;
+      const dx = px - c.x;
+      const dy = py - c.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist <= c.pickupRadius){
+        c.active = false;
+        coins.splice(i,1);
+        score += 20;
+        updateHUD();
+      }
+    }
+
+    for (let i = items.length - 1; i >= 0; i--){
+      const it = items[i];
+      if (!it.active) continue;
+      const px = player.x + player.w/2;
+      const py = player.y + player.h/2;
+      const cx = it.x;
+      const cy = it.y - it.h/2;
+      const dx = px - cx;
+      const dy = py - cy;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist <= (it.pickupRadius || 40)){
+        it.active = false;
+        items.splice(i,1);
+        lives = Math.min(6, lives + 1);
+        updateHUD();
+      }
+    }
+  }
+
+  function updateStage(){
+    const target = nextStageScore();
+    if (score >= target) {
+      stage++;
+      layoutStage();
+      flashStageText('Stage ' + stage);
+      updateHUD();
+    }
+  }
+
+  function drawBackground(){
+    const base = 135 + Math.min(60, (stage-1)*6);
+    const skyColor = `rgb(${base}, ${200 + Math.min(55,(stage-1)*3)}, 235)`;
+    ctx.fillStyle = skyColor;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = 'var(--ground)';
+    ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.fillRect(0, 0, 6, canvas.height);
+    ctx.fillRect(canvas.width - 6, 0, 6, canvas.height);
+  }
+
+  // 메인 루프 및 스폰 로직
+  let lastTime = performance.now();
+  function loop(now){
+    const dt = Math.min(0.033, (now - lastTime) / 1000);
+    lastTime = now;
+
+    // 스폰 타이머
+    if (spawnEnabled && !paused && !gameOver) {
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnEnemy();
+        spawnTimer = Math.max(minSpawnInterval, spawnInterval + (Math.random()-0.5)*0.8);
+      }
+    }
+    // spawn info (간단 표시)
+    const spawnInfoEl = document.getElementById('spawnInfo');
+    if (!spawnInfoEl) {
+      const el = document.createElement('div');
+      el.id = 'spawnInfo';
+      el.style.position = 'fixed';
+      el.style.top = '110px';
+      el.style.left = '50%';
+      el.style.transform = 'translateX(-50%)';
+      el.style.background = 'rgba(0,0,0,0.25)';
+      el.style.padding = '6px 10px';
+      el.style.borderRadius = '8px';
+      el.style.fontSize = '12px';
+      el.style.color = '#fff';
+      el.style.zIndex = '50';
+      el.style.pointerEvents = 'none';
+      document.body.appendChild(el);
+    }
+    document.getElementById('spawnInfo').textContent = spawnEnabled ? `다음 적 스폰까지: ${Math.max(0, spawnTimer).toFixed(1)}s` : '적 자동 스폰: 꺼짐';
+
+    drawBackground();
+
+    if (!paused && !gameOver){
+      if (keys['ArrowLeft'] || keys['KeyA']) player.vx = -player.speed;
+      else if (keys['ArrowRight'] || keys['KeyD']) player.vx = player.speed;
+      else player.vx = 0;
+
+      if ((keys['Space'] || keys['ArrowUp'])) player.jumpBuffer = Math.max(player.jumpBuffer, 0.12);
+
+      player.update(dt, platforms);
+      for (const e of enemies) e.update(dt, player);
+
+      handleCollisions();
+      updateStage();
+
+      for (const p of platforms) p.draw();
+      for (const c of coins) c.draw();
+      for (const it of items) it.draw();
+      for (const e of enemies) e.draw();
+      player.draw();
+    } else {
+      ctx.fillStyle = '#fff';
+      ctx.font = '26px system-ui';
+      const msg = gameOver ? 'Game Over' : 'Paused';
+      ctx.fillText(msg, canvas.width/2 - ctx.measureText(msg).width/2, canvas.height/2 - 10);
+      if (gameOver){
+        ctx.font = '16px system-ui';
+        const sub = '재시작 버튼을 눌러 다시 시작하세요';
+        ctx.fillText(sub, canvas.width/2 - ctx.measureText(sub).width/2, canvas.height/2 + 20);
+      }
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  // 스폰/초기화 보조
+  function spawnEnemy() {
+    const w = canvas.width, h = canvas.height;
+    const side = Math.random() < 0.5 ? 'left' : 'right';
+    const x = side === 'left' ? 40 + Math.random()*80 : w - 40 - Math.random()*80;
+    const types = ['walker','jumper','floater','chaser'];
+    const maxTypeIndex = Math.min(types.length - 1, Math.floor(stage / 2));
+    const t = types[Math.floor(Math.random() * (maxTypeIndex + 1))];
+    const e = new Enemy(x, h - groundHeight - 22, t);
+    e.baseX = x;
+    e.range = 60 + Math.random()*120;
+    e.speed = 0.8 + (stage - 1) * 0.12 + Math.random()*0.2;
+    enemies.push(e);
+  }
+
+  restartBtn.addEventListener('click', () => { initGame(); });
+
+  // 초기 실행
+  resizeCanvas();
+  initGame();
+  requestAnimationFrame(loop);
+
+  canvas.addEventListener('click', () => canvas.focus());
+  </script>
+</body>
+</html>
