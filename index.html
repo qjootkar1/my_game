@@ -2,49 +2,50 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>마리오 점프 - 와이드 화면 & 60FPS 고정</title>
+  <title>Jump man!</title>
   <style>
     :root{
       --sky:#87ceeb; --ground:#6b4f2d; --hud-bg:rgba(0,0,0,0.5); 
       --coin:#ffd54a; --potion:#ff7fbf; --enemy:#e11d48;
     }
     body {
-      margin: 0; background: #222; overflow: hidden;
-      display: flex; flex-direction: column; align-items: center;
+      margin: 0; background: #1a1a1a; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
       font-family: system-ui, sans-serif; height: 100vh;
     }
-    /* 화면 크기에 반응하도록 설정 */
+    /* 적당한 크기로 고정 및 중앙 정렬 */
     canvas {
       background: #87ceeb;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-      margin-top: 100px; border-radius: 4px; display: block;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+      border-radius: 8px; border: 4px solid #333;
+      display: block;
     }
     #hud {
-      position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
-      display: flex; gap: 20px; padding: 10px 24px;
-      background: var(--hud-bg); color: #fff; font-weight: bold;
-      border-radius: 30px; z-index: 100; font-size: 18px;
-      backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2);
+      position: absolute; top: 40px; width: 960px;
+      display: flex; justify-content: center; gap: 40px; 
+      color: #fff; font-weight: bold; font-size: 20px; z-index: 100;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
     }
     #gameGuide {
-      position: fixed; top: 75px; left: 50%; transform: translateX(-50%);
-      width: min(900px, 90%); background: rgba(0,0,0,0.6);
-      padding: 12px 20px; border-radius: 12px; color: #eee; font-size: 14px;
-      display: flex; justify-content: space-between; align-items: center;
-      z-index: 90; pointer-events: none;
+      position: absolute; bottom: 30px; width: 960px;
+      background: rgba(0,0,0,0.7); padding: 10px 0; border-radius: 10px;
+      color: #ccc; font-size: 14px; display: flex; justify-content: space-around;
+      z-index: 90; border: 1px solid rgba(255,255,255,0.1);
     }
-    .guide-icons { display: flex; gap: 15px; }
-    .g-item { display: flex; align-items: center; gap: 6px; }
-    .g-box { width: 18px; height: 18px; border-radius: 4px; display: inline-block; }
+    .g-item { display: flex; align-items: center; gap: 8px; }
+    .g-box { width: 16px; height: 16px; border-radius: 3px; }
+    
     #restartBtn {
-      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      padding: 15px 35px; font-size: 24px; font-weight: bold;
-      background: #e11d48; color: white; border: 4px solid white;
-      border-radius: 12px; cursor: pointer; display: none; z-index: 200;
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      padding: 15px 40px; font-size: 22px; font-weight: bold;
+      background: #e11d48; color: white; border: 3px solid white;
+      border-radius: 50px; cursor: pointer; display: none; z-index: 200;
     }
     #msg {
-      position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
-      font-size: 60px; font-weight: 900; color: #fff; opacity: 0; transition: 0.5s; pointer-events: none; z-index: 150;
+      position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 70px; font-weight: 900; color: #fff; opacity: 0; 
+      transition: 0.4s; pointer-events: none; z-index: 150;
+      text-shadow: 0 10px 20px rgba(0,0,0,0.3);
     }
   </style>
 </head>
@@ -57,12 +58,10 @@
   </div>
 
   <div id="gameGuide">
-    <div class="guide-icons">
-      <div class="g-item"><span class="g-box" style="background:var(--coin)"></span> 코인 +20</div>
-      <div class="g-item"><span class="g-box" style="background:var(--potion)"></span> 회복 +1</div>
-      <div class="g-item"><span class="g-box" style="background:var(--enemy)"></span> 밟기 +50</div>
-    </div>
-    <div>이동: ← → / 점프: Space / 일시정지: P</div>
+    <div class="g-item"><span class="g-box" style="background:var(--coin)"></span> 코인 +20</div>
+    <div class="g-item"><span class="g-box" style="background:var(--potion)"></span> 물약(체력+1)</div>
+    <div class="g-item">적 밟기: 처치(+50)</div>
+    <div>조작: 방향키 & Space / 일시정지: P</div>
   </div>
 
   <div id="msg">STAGE 1</div>
@@ -73,12 +72,15 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // 게임 상수 (60FPS 고정용)
+    // 적정 해상도 설정 (960x540: 16:9 비율)
+    canvas.width = 960;
+    canvas.height = 540;
+
     const FPS = 60;
     const frameDelay = 1000 / FPS;
-    const GRAVITY = 0.6;
-    const JUMP_POWER = 15.0;
-    const MOVE_SPEED = 5.5;
+    const GRAVITY = 0.65;
+    const JUMP_POWER = 15.5;
+    const MOVE_SPEED = 5.2;
 
     let score = 0, lives = 4, stage = 1;
     let paused = false, gameOver = false;
@@ -92,21 +94,10 @@
     };
     window.onkeyup = (e) => keys[e.code] = false;
 
-    // 캔버스 크기를 화면에 맞게 조절 (넓게!)
-    function resizeCanvas() {
-      canvas.width = Math.max(800, window.innerWidth * 0.85);
-      canvas.height = Math.max(500, window.innerHeight * 0.7);
-    }
-    window.addEventListener('resize', () => {
-      resizeCanvas();
-      // 크기가 바뀔 때 바닥 위치 등을 재조정하기 위해 스테이지 초기화
-      initStage(); 
-    });
-
     class Player {
-      constructor() { this.w = 30; this.h = 40; this.reset(); }
+      constructor() { this.w = 32; this.h = 44; this.reset(); }
       reset() {
-        this.x = 100; this.y = 300; this.vx = 0; this.vy = 0;
+        this.x = 80; this.y = 400; this.vx = 0; this.vy = 0;
         this.onGround = false; this.invincible = 0;
       }
       update(platforms) {
@@ -132,24 +123,26 @@
       }
       draw() {
         if (Date.now() < this.invincible && Math.floor(Date.now()/100)%2) return;
-        ctx.fillStyle = "#2b6cb0"; ctx.fillRect(this.x, this.y, this.w, this.h);
-        ctx.fillStyle = "#f1c27d"; ctx.beginPath(); ctx.arc(this.x+15, this.y+12, 8, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#2b6cb0"; 
+        ctx.roundRect ? ctx.beginPath() || ctx.roundRect(this.x, this.y, this.w, this.h, 5) || ctx.fill() : ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = "#f1c27d"; ctx.beginPath(); ctx.arc(this.x+this.w/2, this.y+14, 9, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#000"; ctx.fillRect(this.x+this.w/2+2, this.y+10, 3, 3); // 눈
       }
     }
 
     class Enemy {
-      constructor(x, y) { this.x=x; this.y=y; this.w=30; this.h=30; this.dir=-1; this.speed=2+(stage*0.3); this.active=true; }
+      constructor(x, y) { this.x=x; this.y=y; this.w=30; this.h=30; this.dir=-1; this.speed=2+(stage*0.4); this.active=true; }
       update() { this.x += this.dir * this.speed; if(this.x<=0 || this.x+this.w>=canvas.width) this.dir *= -1; }
       draw() { if(!this.active) return; ctx.fillStyle="#e11d48"; ctx.fillRect(this.x, this.y, this.w, this.h); }
     }
 
     class Item {
-      constructor(x, y, type) { this.x=x; this.y=y; this.type=type; this.w=20; this.h=20; this.active=true; }
+      constructor(x, y, type) { this.x=x; this.y=y; this.type=type; this.w=22; this.h=22; this.active=true; }
       draw() {
         if(!this.active) return;
         ctx.fillStyle = this.type==='coin' ? "#ffd54a" : "#ff7fbf";
-        if(this.type==='coin') { ctx.beginPath(); ctx.arc(this.x+10, this.y+10, 10, 0, Math.PI*2); ctx.fill(); }
-        else { ctx.fillRect(this.x, this.y, 20, 20); }
+        if(this.type==='coin') { ctx.beginPath(); ctx.arc(this.x+11, this.y+11, 11, 0, Math.PI*2); ctx.fill(); ctx.strokeStyle="#fff"; ctx.stroke(); }
+        else { ctx.fillRect(this.x+3, this.y, 16, 22); ctx.fillStyle="#fff"; ctx.fillRect(this.x+7, this.y+5, 8, 8); }
       }
     }
 
@@ -159,18 +152,25 @@
     function initStage() {
       const w = canvas.width, h = canvas.height;
       platforms = [ 
-        {x: w*0.15, y: h*0.7, w: 180, h: 20}, 
-        {x: w*0.5, y: h*0.5, w: 200, h: 20}, 
-        {x: w*0.75, y: h*0.6, w: 150, h: 20} 
+        {x: 150, y: 380, w: 200, h: 20}, 
+        {x: 400, y: 280, w: 220, h: 20}, 
+        {x: 700, y: 350, w: 180, h: 20},
+        {x: 100, y: 200, w: 150, h: 20}
       ];
-      items = [ new Item(w*0.2, h*0.7-30, 'coin'), new Item(w*0.55, h*0.5-30, 'coin'), new Item(w*0.8, h*0.6-30, 'coin') ];
-      if(stage % 2 === 0) items.push(new Item(w-100, h-100, 'potion'));
-      enemies = [ new Enemy(w-150, h-90) ];
-      if(stage > 1) enemies.push(new Enemy(w*0.3, h-90));
+      items = [ 
+        new Item(240, 350, 'coin'), new Item(500, 250, 'coin'), 
+        new Item(780, 320, 'coin'), new Item(160, 170, 'coin') 
+      ];
+      // 체력 물약 등장 로직
+      if(lives < 4 || stage % 2 === 0) items.push(new Item(w-100, 410, 'potion'));
+      
+      enemies = [ new Enemy(w-200, 450) ];
+      if(stage > 1) enemies.push(new Enemy(450, 250));
+      if(stage > 2) enemies.push(new Enemy(150, 450));
 
-      document.getElementById('msg').innerText = `STAGE ${stage}`;
-      document.getElementById('msg').style.opacity = 1;
-      setTimeout(() => document.getElementById('msg').style.opacity = 0, 1500);
+      const m = document.getElementById('msg');
+      m.innerText = `STAGE ${stage}`; m.style.opacity = 1;
+      setTimeout(() => m.style.opacity = 0, 1500);
     }
 
     function updateUI() {
@@ -185,6 +185,7 @@
       if (elapsed < frameDelay) return;
       lastFrameTime = currentTime - (elapsed % frameDelay);
 
+      // 배경
       ctx.fillStyle = "#87ceeb"; ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "#6b4f2d"; ctx.fillRect(0, canvas.height-60, canvas.width, 60);
 
@@ -210,20 +211,30 @@
         });
       }
 
-      platforms.forEach(p => { ctx.fillStyle="#8b6b3c"; ctx.fillRect(p.x, p.y, p.w, p.h); ctx.fillStyle="#b98a4a"; ctx.fillRect(p.x, p.y, p.w, 5); });
+      platforms.forEach(p => { 
+        ctx.fillStyle="#8b6b3c"; ctx.fillRect(p.x, p.y, p.w, p.h); 
+        ctx.fillStyle="#b98a4a"; ctx.fillRect(p.x, p.y, p.w, 4); 
+      });
       items.forEach(i => i.draw());
       enemies.forEach(e => e.draw());
       player.draw();
 
-      if(paused) { ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#fff"; ctx.font="30px sans-serif"; ctx.fillText("PAUSED", canvas.width/2-50, canvas.height/2); }
-      if(gameOver) { ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#fff"; ctx.font="40px sans-serif"; ctx.fillText("GAME OVER", canvas.width/2-100, canvas.height/2); }
+      if(paused) { 
+        ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(0,0,canvas.width,canvas.height); 
+        ctx.fillStyle="#fff"; ctx.font="bold 30px sans-serif"; ctx.textAlign="center";
+        ctx.fillText("PAUSED", canvas.width/2, canvas.height/2); 
+      }
+      if(gameOver) { 
+        ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); 
+        ctx.fillStyle="#fff"; ctx.font="bold 40px sans-serif"; ctx.textAlign="center";
+        ctx.fillText("GAME OVER", canvas.width/2, canvas.height/2); 
+      }
     }
 
     document.getElementById('restartBtn').onclick = () => {
       score=0; lives=4; stage=1; gameOver=false; player.reset(); initStage(); updateUI(); document.getElementById('restartBtn').style.display='none';
     };
 
-    resizeCanvas();
     initStage();
     updateUI();
     requestAnimationFrame(loop);
