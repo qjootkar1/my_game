@@ -2,8 +2,7 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>Jump Man!</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>마리오 점프 - 와이드 화면 & 60FPS 고정</title>
   <style>
     :root{
       --sky:#87ceeb; --ground:#6b4f2d; --hud-bg:rgba(0,0,0,0.5); 
@@ -14,6 +13,7 @@
       display: flex; flex-direction: column; align-items: center;
       font-family: system-ui, sans-serif; height: 100vh;
     }
+    /* 화면 크기에 반응하도록 설정 */
     canvas {
       background: #87ceeb;
       box-shadow: 0 10px 40px rgba(0,0,0,0.5);
@@ -28,7 +28,7 @@
     }
     #gameGuide {
       position: fixed; top: 75px; left: 50%; transform: translateX(-50%);
-      width: min(850px, 90%); background: rgba(0,0,0,0.6);
+      width: min(900px, 90%); background: rgba(0,0,0,0.6);
       padding: 12px 20px; border-radius: 12px; color: #eee; font-size: 14px;
       display: flex; justify-content: space-between; align-items: center;
       z-index: 90; pointer-events: none;
@@ -72,20 +72,17 @@
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('scoreEl'), livesEl = document.getElementById('livesEl');
-    const stageEl = document.getElementById('stageEl'), msgEl = document.getElementById('msg'), restartBtn = document.getElementById('restartBtn');
-
-    // 게임 상수
+    
+    // 게임 상수 (60FPS 고정용)
     const FPS = 60;
-    const frameDelay = 1000 / FPS; // 약 16.66ms
+    const frameDelay = 1000 / FPS;
     const GRAVITY = 0.6;
     const JUMP_POWER = 15.0;
-    const MOVE_SPEED = 5;
+    const MOVE_SPEED = 5.5;
 
     let score = 0, lives = 4, stage = 1;
     let paused = false, gameOver = false;
     let lastFrameTime = 0;
-    let spawnTimer = 0;
 
     const keys = {};
     window.onkeydown = (e) => { 
@@ -95,11 +92,21 @@
     };
     window.onkeyup = (e) => keys[e.code] = false;
 
-    // 객체 클래스
+    // 캔버스 크기를 화면에 맞게 조절 (넓게!)
+    function resizeCanvas() {
+      canvas.width = Math.max(800, window.innerWidth * 0.85);
+      canvas.height = Math.max(500, window.innerHeight * 0.7);
+    }
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      // 크기가 바뀔 때 바닥 위치 등을 재조정하기 위해 스테이지 초기화
+      initStage(); 
+    });
+
     class Player {
       constructor() { this.w = 30; this.h = 40; this.reset(); }
       reset() {
-        this.x = 100; this.y = 400; this.vx = 0; this.vy = 0;
+        this.x = 100; this.y = 300; this.vx = 0; this.vy = 0;
         this.onGround = false; this.invincible = 0;
       }
       update(platforms) {
@@ -109,14 +116,14 @@
         this.vy += GRAVITY;
         this.x += this.vx; this.y += this.vy;
 
-        // 바닥/화면 제한
         if (this.x < 0) this.x = 0;
         if (this.x > canvas.width - this.w) this.x = canvas.width - this.w;
-        if (this.y + this.h > canvas.height - 60) { this.y = canvas.height - 60 - this.h; this.vy = 0; this.onGround = true; }
+        
+        const groundY = canvas.height - 60;
+        if (this.y + this.h > groundY) { this.y = groundY - this.h; this.vy = 0; this.onGround = true; }
 
-        // 플랫폼 충돌
         platforms.forEach(p => {
-          if (this.vx >= 0 ? (this.x + this.w > p.x && this.x < p.x + p.w) : (this.x < p.x + p.w && this.x + this.w > p.x)) {
+          if (this.x + this.w > p.x && this.x < p.x + p.w) {
             if (this.vy >= 0 && this.y + this.h >= p.y && this.y + this.h <= p.y + 20) {
               this.y = p.y - this.h; this.vy = 0; this.onGround = true;
             }
@@ -146,37 +153,36 @@
       }
     }
 
-    const player = new Player();
+    let player = new Player();
     let platforms = [], enemies = [], items = [];
 
     function initStage() {
-      canvas.width = 800; canvas.height = 500;
-      platforms = [ {x:150, y:350, w:150, h:20}, {x:450, y:250, w:180, h:20}, {x:100, y:180, w:120, h:20} ];
-      items = [ new Item(215, 320, 'coin'), new Item(530, 220, 'coin'), new Item(150, 150, 'coin') ];
-      if(stage % 2 === 0) items.push(new Item(700, 410, 'potion'));
-      enemies = [ new Enemy(600, 410) ];
-      if(stage > 2) enemies.push(new Enemy(200, 320));
-      
-      msgEl.innerText = `STAGE ${stage}`; msgEl.style.opacity = 1;
-      setTimeout(() => msgEl.style.opacity = 0, 1500);
+      const w = canvas.width, h = canvas.height;
+      platforms = [ 
+        {x: w*0.15, y: h*0.7, w: 180, h: 20}, 
+        {x: w*0.5, y: h*0.5, w: 200, h: 20}, 
+        {x: w*0.75, y: h*0.6, w: 150, h: 20} 
+      ];
+      items = [ new Item(w*0.2, h*0.7-30, 'coin'), new Item(w*0.55, h*0.5-30, 'coin'), new Item(w*0.8, h*0.6-30, 'coin') ];
+      if(stage % 2 === 0) items.push(new Item(w-100, h-100, 'potion'));
+      enemies = [ new Enemy(w-150, h-90) ];
+      if(stage > 1) enemies.push(new Enemy(w*0.3, h-90));
+
+      document.getElementById('msg').innerText = `STAGE ${stage}`;
+      document.getElementById('msg').style.opacity = 1;
+      setTimeout(() => document.getElementById('msg').style.opacity = 0, 1500);
     }
 
     function updateUI() {
-      scoreEl.innerText = `Score: ${score}`;
-      livesEl.innerText = '❤️'.repeat(Math.max(0, lives));
-      stageEl.innerText = `Stage: ${stage}`;
+      document.getElementById('scoreEl').innerText = `Score: ${score}`;
+      document.getElementById('livesEl').innerText = '❤️'.repeat(Math.max(0, lives));
+      document.getElementById('stageEl').innerText = `Stage: ${stage}`;
     }
 
-    // 메인 루프 (프레임 고정 로직)
     function loop(currentTime) {
       requestAnimationFrame(loop);
-
       const elapsed = currentTime - lastFrameTime;
-
-      // 16.66ms가 지나지 않았으면 실행하지 않고 건너뜀 (60FPS 제한)
       if (elapsed < frameDelay) return;
-
-      // 실행 시점 보정
       lastFrameTime = currentTime - (elapsed % frameDelay);
 
       ctx.fillStyle = "#87ceeb"; ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -184,7 +190,6 @@
 
       if (!paused && !gameOver) {
         player.update(platforms);
-        
         items.forEach(it => {
           if(it.active && player.x < it.x+it.w && player.x+player.w > it.x && player.y < it.y+it.h && player.y+player.h > it.y) {
             it.active = false;
@@ -193,14 +198,13 @@
             if(items.filter(i=>i.type==='coin' && i.active).length === 0) { stage++; initStage(); player.reset(); updateUI(); }
           }
         });
-
         enemies.forEach(e => {
           if(!e.active) return; e.update();
           if(player.x < e.x+e.w && player.x+player.w > e.x && player.y < e.y+e.h && player.y+player.h > e.y) {
             if(player.vy > 0 && player.y + player.h < e.y + 15) { e.active=false; player.vy=-12; score+=50; updateUI(); }
             else if(Date.now() > player.invincible) {
               lives--; player.invincible = Date.now()+1000; player.vy=-8; updateUI();
-              if(lives <= 0) { gameOver=true; restartBtn.style.display='block'; }
+              if(lives <= 0) { gameOver=true; document.getElementById('restartBtn').style.display='block'; }
             }
           }
         });
@@ -211,14 +215,15 @@
       enemies.forEach(e => e.draw());
       player.draw();
 
-      if(paused) { ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#fff"; ctx.font="30px sans-serif"; ctx.fillText("PAUSED", 350, 250); }
-      if(gameOver) { ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#fff"; ctx.font="40px sans-serif"; ctx.fillText("GAME OVER", 300, 250); }
+      if(paused) { ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#fff"; ctx.font="30px sans-serif"; ctx.fillText("PAUSED", canvas.width/2-50, canvas.height/2); }
+      if(gameOver) { ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#fff"; ctx.font="40px sans-serif"; ctx.fillText("GAME OVER", canvas.width/2-100, canvas.height/2); }
     }
 
-    restartBtn.onclick = () => {
-      score=0; lives=4; stage=1; gameOver=false; player.reset(); initStage(); updateUI(); restartBtn.style.display='none';
+    document.getElementById('restartBtn').onclick = () => {
+      score=0; lives=4; stage=1; gameOver=false; player.reset(); initStage(); updateUI(); document.getElementById('restartBtn').style.display='none';
     };
 
+    resizeCanvas();
     initStage();
     updateUI();
     requestAnimationFrame(loop);
