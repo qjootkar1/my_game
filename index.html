@@ -2,451 +2,226 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
-  <title>마리오풍 점프 게임 - 완벽 복원판</title>
+  <title>Jump Man!</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    /* 원래의 스타일 복구 */
     :root{
-      --sky:#87ceeb; --ground:#6b4f2d; --platform:#8b6b3c;
-      --player-body:#2b6cb0; --player-face:#f1c27d;
-      --enemy:#e11d48; --coin:#ffd54a; --potion:#ff7fbf;
-      --hud-bg:rgba(0,0,0,0.45); --text:#fff;
+      --sky:#87ceeb; --ground:#6b4f2d; --hud-bg:rgba(0,0,0,0.5); 
+      --coin:#ffd54a; --potion:#ff7fbf; --enemy:#e11d48;
     }
-    html,body{height:100%;margin:0; background:var(--sky); overflow:hidden;}
-    body{ display:flex; flex-direction:column; align-items:center; font-family:system-ui, sans-serif; }
-    
-    /* 캔버스: 반응형 크기 복원 */
-    canvas{
-      background:linear-gradient(var(--sky), #bde0fe);
-      border:3px solid #2a3154;
-      box-shadow: 0 12px 36px rgba(0,0,0,0.25);
-      margin-top: 110px; /* 가이드 공간 확보 */
-      display: block;
+    body {
+      margin: 0; background: #222; overflow: hidden;
+      display: flex; flex-direction: column; align-items: center;
+      font-family: system-ui, sans-serif; height: 100vh;
     }
-
-    /* HUD 및 가이드 복구 */
-    #hud{
-      position:fixed; top:12px; left:50%; transform:translateX(-50%);
-      display:flex; gap:18px; padding:8px 16px; background:var(--hud-bg);
-      border-radius:10px; font-weight:700; color:#fff; z-index:50;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    canvas {
+      background: #87ceeb;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      margin-top: 100px; border-radius: 4px; display: block;
     }
-    #gameGuide{
-      position:fixed; top:60px; left:50%; transform:translateX(-50%);
-      width: min(920px, 94%); background: var(--hud-bg);
-      padding:10px 14px; border-radius:10px; font-size:14px; color:#fff;
-      display:flex; gap:12px; align-items:center; justify-content:space-between; z-index:50;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    #hud {
+      position: fixed; top: 15px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 20px; padding: 10px 24px;
+      background: var(--hud-bg); color: #fff; font-weight: bold;
+      border-radius: 30px; z-index: 100; font-size: 18px;
+      backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2);
     }
-    .guide-left { display:flex; gap:15px; align-items:center; }
-    .guide-item { display:flex; gap:8px; align-items:center; }
-    .guide-icon { 
-      width:28px; height:28px; border-radius:6px; display:flex; 
-      align-items:center; justify-content:center; font-weight:bold; 
-      color:#111; font-size:12px; box-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+    #gameGuide {
+      position: fixed; top: 75px; left: 50%; transform: translateX(-50%);
+      width: min(850px, 90%); background: rgba(0,0,0,0.6);
+      padding: 12px 20px; border-radius: 12px; color: #eee; font-size: 14px;
+      display: flex; justify-content: space-between; align-items: center;
+      z-index: 90; pointer-events: none;
     }
-    /* 아이콘 색상 */
-    .icon-coin { background: var(--coin); }
-    .icon-potion { background: var(--potion); }
-    .icon-stomp { background: var(--enemy); color:#fff; }
-    
-    .guide-right { text-align:right; font-size:13px; opacity:0.9; }
-
-    #stageFlash {
-      position:fixed; top:40%; left:50%; transform:translate(-50%,-50%);
-      font-size:48px; font-weight:800; color:#fff; 
-      text-shadow: 0 4px 12px rgba(0,0,0,0.5);
-      opacity:0; z-index:70; pointer-events:none; transition: opacity 0.5s;
+    .guide-icons { display: flex; gap: 15px; }
+    .g-item { display: flex; align-items: center; gap: 6px; }
+    .g-box { width: 18px; height: 18px; border-radius: 4px; display: inline-block; }
+    #restartBtn {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      padding: 15px 35px; font-size: 24px; font-weight: bold;
+      background: #e11d48; color: white; border: 4px solid white;
+      border-radius: 12px; cursor: pointer; display: none; z-index: 200;
     }
-    #restartBtn{
-      position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      padding:12px 24px; font-size:20px; background:#e11d48; color:#fff;
-      border:3px solid #fff; border-radius:8px; cursor:pointer; display:none; z-index:100;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    #msg {
+      position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 60px; font-weight: 900; color: #fff; opacity: 0; transition: 0.5s; pointer-events: none; z-index: 150;
     }
-    #restartBtn:hover { background: #ff3366; }
-  </script>
   </style>
 </head>
 <body>
+
   <div id="hud">
-    <div id="score">Score: 0</div>
-    <div id="lives">❤️❤️❤️❤️</div>
-    <div id="stage">Stage: 1</div>
-    <div id="next">Next: 150</div>
+    <div id="scoreEl">Score: 0</div>
+    <div id="livesEl">❤️❤️❤️❤️</div>
+    <div id="stageEl">Stage: 1</div>
   </div>
 
   <div id="gameGuide">
-    <div class="guide-left">
-      <div class="guide-item"><div class="guide-icon icon-coin">C</div><span>코인 +20</span></div>
-      <div class="guide-item"><div class="guide-icon icon-potion">P</div><span>체력 +1</span></div>
-      <div class="guide-item"><div class="guide-icon icon-stomp">S</div><span>밟기 +50</span></div>
+    <div class="guide-icons">
+      <div class="g-item"><span class="g-box" style="background:var(--coin)"></span> 코인 +20</div>
+      <div class="g-item"><span class="g-box" style="background:var(--potion)"></span> 회복 +1</div>
+      <div class="g-item"><span class="g-box" style="background:var(--enemy)"></span> 밟기 +50</div>
     </div>
-    <div class="guide-right">
-      <div>이동: ← → / 점프: Space / 일시정지: P</div>
-      <div style="font-size:11px; margin-top:4px;">적을 위에서 밟으면 처치 가능</div>
-    </div>
+    <div>이동: ← → / 점프: Space / 일시정지: P</div>
   </div>
 
-  <div id="stageFlash">Stage 1</div>
+  <div id="msg">STAGE 1</div>
   <button id="restartBtn">다시 시작</button>
   <canvas id="gameCanvas"></canvas>
 
   <script>
-  const canvas = document.getElementById('gameCanvas');
-  const ctx = canvas.getContext('2d');
-  
-  // UI 요소
-  const scoreEl = document.getElementById('score');
-  const livesEl = document.getElementById('lives');
-  const stageEl = document.getElementById('stage');
-  const nextEl = document.getElementById('next');
-  const stageFlash = document.getElementById('stageFlash');
-  const restartBtn = document.getElementById('restartBtn');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('scoreEl'), livesEl = document.getElementById('livesEl');
+    const stageEl = document.getElementById('stageEl'), msgEl = document.getElementById('msg'), restartBtn = document.getElementById('restartBtn');
 
-  // --- 1. 안전한 색상 정의 (검은 화면 방지용) ---
-  const C = {
-    sky: '#87ceeb', ground: '#6b4f2d', platform: '#8b6b3c', platformTop: '#b98a4a',
-    player: '#2b6cb0', playerFace: '#f1c27d', enemy: '#e11d48', 
-    coin: '#ffd54a', potion: '#ff7fbf', outline: 'rgba(0,0,0,0.15)'
-  };
+    // 게임 상수
+    const FPS = 60;
+    const frameDelay = 1000 / FPS; // 약 16.66ms
+    const GRAVITY = 0.6;
+    const JUMP_POWER = 15.0;
+    const MOVE_SPEED = 5;
 
-  // --- 2. 게임 설정 ---
-  const gravity = 0.6;
-  const groundHeight = 80;
-  const maxFallSpeed = 14;
-  let score = 0, lives = 4, stage = 1;
-  let paused = false, gameOver = false;
-  let spawnTimer = 0, spawnInterval = 4.0;
-  const keys = {};
+    let score = 0, lives = 4, stage = 1;
+    let paused = false, gameOver = false;
+    let lastFrameTime = 0;
+    let spawnTimer = 0;
 
-  // 반응형 캔버스 크기 (원래 코드 복원)
-  function resizeCanvas() {
-    canvas.width = Math.max(800, Math.floor(window.innerWidth * 0.85));
-    canvas.height = Math.max(600, Math.floor(window.innerHeight * 0.75));
-  }
-  window.addEventListener('resize', resizeCanvas);
+    const keys = {};
+    window.onkeydown = (e) => { 
+      keys[e.code] = true; 
+      if(e.code === 'KeyP') paused = !paused;
+      if(['Space','ArrowUp','ArrowDown'].includes(e.code)) e.preventDefault();
+    };
+    window.onkeyup = (e) => keys[e.code] = false;
 
-  // 키 입력 처리
-  window.addEventListener('keydown', (e) => {
-    if(['ArrowLeft','ArrowRight','ArrowUp','Space'].includes(e.code)) e.preventDefault();
-    keys[e.code] = true;
-    if (e.code === 'KeyP') paused = !paused;
-  });
-  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
-
-  // 유틸리티: 둥근 사각형 그리기 (호환성 문제 해결판)
-  function roundRect(ctx, x, y, w, h, r, fill, stroke) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-    if (fill) ctx.fill();
-    if (stroke) { ctx.lineWidth=2; ctx.stroke(); }
-  }
-
-  const rectOverlap = (A, B) => A.x < B.x + B.w && A.x + A.w > B.x && A.y < B.y + B.h && A.y + A.h > B.y;
-
-  // --- 3. 엔티티 클래스 ---
-
-  class Player {
-    constructor(x, y) {
-      this.x = x; this.y = y; this.w = 30; this.h = 40;
-      this.vx = 0; this.vy = 0;
-      this.speed = 4.8;
-      this.jumpPower = 15.5; // 점프력 상향 유지
-      this.onGround = false;
-      this.invincibleUntil = 0;
-      this.jumpBuffer = 0; // 점프 입력 기억
-    }
-    rect() { return { x: this.x, y: this.y, w: this.w, h: this.h }; }
-    
-    // update 함수에서 중복 로직 제거됨
-    update(dt, platforms) {
-      const left = keys['ArrowLeft'] || keys['KeyA'];
-      const right = keys['ArrowRight'] || keys['KeyD'];
-      const jump = keys['Space'] || keys['ArrowUp'];
-
-      // 이동
-      this.vx = (right ? this.speed : 0) - (left ? this.speed : 0);
-      
-      // 점프 버퍼링
-      if (jump) this.jumpBuffer = 0.15;
-      else this.jumpBuffer = Math.max(0, this.jumpBuffer - dt);
-
-      // 중력
-      this.vy += gravity;
-      this.vy = Math.min(this.vy, maxFallSpeed);
-
-      const prevBottom = this.y + this.h;
-      
-      // X축 이동
-      this.x += this.vx * dt * 60; // 프레임 보정
-      this.x = Math.max(0, Math.min(canvas.width - this.w, this.x));
-
-      // 플랫폼 충돌 (X축 뚫림 방지용 로직 대신, 단순하게 Y축 위주 판정으로 변경하여 버그 감소)
-      // Y축 이동
-      this.y += this.vy * dt * 60;
-
-      // 땅 충돌
-      const groundY = canvas.height - groundHeight;
-      if (this.y + this.h >= groundY) {
-        this.y = groundY - this.h;
-        this.vy = 0;
-        this.onGround = true;
-      } else {
-        this.onGround = false;
+    // 객체 클래스
+    class Player {
+      constructor() { this.w = 30; this.h = 40; this.reset(); }
+      reset() {
+        this.x = 100; this.y = 400; this.vx = 0; this.vy = 0;
+        this.onGround = false; this.invincible = 0;
       }
+      update(platforms) {
+        this.vx = (keys['ArrowRight'] || keys['KeyD'] ? MOVE_SPEED : 0) - (keys['ArrowLeft'] || keys['KeyA'] ? MOVE_SPEED : 0);
+        if ((keys['Space'] || keys['ArrowUp']) && this.onGround) { this.vy = -JUMP_POWER; this.onGround = false; }
 
-      // 플랫폼 위 착지
-      for (const p of platforms) {
-        const pr = p.rect();
-        if (this.x + this.w > pr.x && this.x < pr.x + pr.w) { // X가 겹칠 때
-          // 위에서 아래로 떨어지면서, 발이 플랫폼 윗면 근처일 때
-          if (this.vy >= 0 && prevBottom <= pr.y + 10 && this.y + this.h >= pr.y) {
-            this.y = pr.y - this.h;
-            this.vy = 0;
-            this.onGround = true;
+        this.vy += GRAVITY;
+        this.x += this.vx; this.y += this.vy;
+
+        // 바닥/화면 제한
+        if (this.x < 0) this.x = 0;
+        if (this.x > canvas.width - this.w) this.x = canvas.width - this.w;
+        if (this.y + this.h > canvas.height - 60) { this.y = canvas.height - 60 - this.h; this.vy = 0; this.onGround = true; }
+
+        // 플랫폼 충돌
+        platforms.forEach(p => {
+          if (this.vx >= 0 ? (this.x + this.w > p.x && this.x < p.x + p.w) : (this.x < p.x + p.w && this.x + this.w > p.x)) {
+            if (this.vy >= 0 && this.y + this.h >= p.y && this.y + this.h <= p.y + 20) {
+              this.y = p.y - this.h; this.vy = 0; this.onGround = true;
+            }
           }
-        }
+        });
       }
-
-      // 점프 실행
-      if (this.jumpBuffer > 0 && this.onGround) {
-        this.vy = -this.jumpPower;
-        this.onGround = false;
-        this.jumpBuffer = 0;
+      draw() {
+        if (Date.now() < this.invincible && Math.floor(Date.now()/100)%2) return;
+        ctx.fillStyle = "#2b6cb0"; ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = "#f1c27d"; ctx.beginPath(); ctx.arc(this.x+15, this.y+12, 8, 0, Math.PI*2); ctx.fill();
       }
     }
-    
-    draw() {
-      if (Date.now() < this.invincibleUntil && Math.floor(Date.now()/100)%2===0) ctx.globalAlpha = 0.5;
-      ctx.fillStyle = C.player;
-      roundRect(ctx, this.x, this.y, this.w, this.h, 6, true, false);
-      ctx.fillStyle = C.playerFace;
-      ctx.beginPath(); ctx.arc(this.x + this.w/2, this.y + 12, 8, 0, Math.PI*2); ctx.fill();
-      ctx.globalAlpha = 1.0;
-    }
-  }
 
-  class Platform {
-    constructor(x,y,w,h){ this.x=x;this.y=y;this.w=w;this.h=h; }
-    rect(){ return {x:this.x, y:this.y, w:this.w, h:this.h}; }
-    draw(){
-      ctx.fillStyle = C.platform;
-      roundRect(ctx, this.x, this.y, this.w, this.h, 4, true);
-      ctx.fillStyle = C.platformTop;
-      ctx.fillRect(this.x+2, this.y, this.w-4, 4);
-    }
-  }
-
-  class Coin {
-    constructor(x,y){ this.x=x; this.y=y; this.r=11; this.active=true; }
-    draw(){
-      if(!this.active) return;
-      ctx.fillStyle = C.coin;
-      ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.stroke();
-      ctx.fillStyle = '#fff'; ctx.font='10px sans-serif'; ctx.fillText('$', this.x-3, this.y+4);
-    }
-  }
-
-  // 복구된 물약 클래스
-  class Potion {
-    constructor(x,y){ this.x=x; this.y=y; this.w=16; this.h=20; this.active=true; }
-    rect(){ return {x:this.x, y:this.y, w:this.w, h:this.h}; }
-    draw(){
-      if(!this.active) return;
-      ctx.fillStyle = C.potion;
-      roundRect(ctx, this.x, this.y, this.w, this.h, 4, true);
-      ctx.fillStyle = '#fff'; ctx.fillRect(this.x+6, this.y+4, 4, 4);
-    }
-  }
-
-  class Enemy {
-    constructor(x,y){
-      this.x=x; this.y=y; this.w=28; this.h=24; this.active=true;
-      this.dir = Math.random()<0.5 ? 1 : -1;
-      this.speed = 1.0 + (stage * 0.2); 
-    }
-    update(dt){
-      this.x += this.dir * this.speed * dt * 60;
-      if(this.x <= 0 || this.x + this.w >= canvas.width) this.dir *= -1;
-    }
-    draw(){
-      if(!this.active) return;
-      ctx.fillStyle = C.enemy;
-      roundRect(ctx, this.x, this.y, this.w, this.h, 5, true);
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(this.x+8, this.y+8, 4, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(this.x+20, this.y+8, 4, 0, Math.PI*2); ctx.fill();
-    }
-  }
-
-  let player;
-  let platforms = [], coins = [], items = [], enemies = [];
-
-  // --- 4. 스테이지 레이아웃 (아이템 배치 복구) ---
-  function layoutStage() {
-    const w = canvas.width, h = canvas.height;
-    platforms = []; coins = []; items = []; enemies = [];
-
-    // 기본 플랫폼
-    platforms.push(new Platform(w*0.1, h - 180, 180, 20));
-    platforms.push(new Platform(w*0.5, h - 280, 200, 20));
-    platforms.push(new Platform(w*0.75, h - 200, 160, 20));
-
-    // 스테이지가 높으면 추가 플랫폼
-    if(stage > 2) platforms.push(new Platform(w*0.3, h - 380, 150, 20));
-
-    // 코인 배치
-    platforms.forEach(p => {
-      coins.push(new Coin(p.x + p.w/2, p.y - 20));
-    });
-    // 공중 코인
-    coins.push(new Coin(w*0.5, h - 350));
-
-    // 물약 배치 (짝수 스테이지마다)
-    if(stage % 2 === 0 || lives <= 2) {
-      items.push(new Potion(w*0.9, h - groundHeight - 25));
+    class Enemy {
+      constructor(x, y) { this.x=x; this.y=y; this.w=30; this.h=30; this.dir=-1; this.speed=2+(stage*0.3); this.active=true; }
+      update() { this.x += this.dir * this.speed; if(this.x<=0 || this.x+this.w>=canvas.width) this.dir *= -1; }
+      draw() { if(!this.active) return; ctx.fillStyle="#e11d48"; ctx.fillRect(this.x, this.y, this.w, this.h); }
     }
 
-    // 적 배치
-    let enemyCount = Math.min(stage + 1, 5);
-    for(let i=0; i<enemyCount; i++){
-      enemies.push(new Enemy(Math.random()*(w-100)+50, h - groundHeight - 24));
-    }
-
-    spawnInterval = Math.max(1.5, 4.0 - (stage * 0.3));
-    flashStage(`Stage ${stage}`);
-  }
-
-  function flashStage(text){
-    stageFlash.textContent = text;
-    stageFlash.style.opacity = 1;
-    setTimeout(() => stageFlash.style.opacity = 0, 1500);
-  }
-
-  function updateHUD(){
-    scoreEl.textContent = `Score: ${score}`;
-    livesEl.textContent = '❤️'.repeat(Math.max(0, lives));
-    stageEl.textContent = `Stage: ${stage}`;
-    nextEl.textContent = `Next: ${stage * 150}`;
-  }
-
-  function initGame(){
-    resizeCanvas();
-    player = new Player(100, canvas.height - 150);
-    score = 0; lives = 4; stage = 1;
-    gameOver = false; paused = false;
-    restartBtn.style.display = 'none';
-    layoutStage();
-    updateHUD();
-  }
-
-  function loop(now){
-    // 델타 타임 고정 (144Hz 대응)
-    const dt = 0.016; 
-    
-    // 1. 화면 초기화 (검은 화면 방지 핵심)
-    // 그라데이션 대신 단색 혹은 JS에서 그라데이션 생성
-    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    grad.addColorStop(0, C.sky);
-    grad.addColorStop(1, '#bde0fe');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // 땅 그리기
-    ctx.fillStyle = C.ground;
-    ctx.fillRect(0, canvas.height - groundHeight, canvas.width, groundHeight);
-
-    if (!paused && !gameOver){
-      player.update(dt, platforms);
-
-      // 적 스폰
-      spawnTimer += dt;
-      if(spawnTimer > spawnInterval){
-        enemies.push(new Enemy(Math.random() > 0.5 ? 0 : canvas.width, canvas.height - groundHeight - 24));
-        spawnTimer = 0;
+    class Item {
+      constructor(x, y, type) { this.x=x; this.y=y; this.type=type; this.w=20; this.h=20; this.active=true; }
+      draw() {
+        if(!this.active) return;
+        ctx.fillStyle = this.type==='coin' ? "#ffd54a" : "#ff7fbf";
+        if(this.type==='coin') { ctx.beginPath(); ctx.arc(this.x+10, this.y+10, 10, 0, Math.PI*2); ctx.fill(); }
+        else { ctx.fillRect(this.x, this.y, 20, 20); }
       }
+    }
 
-      // 코인 충돌
-      coins.forEach(c => {
-        if(c.active && rectOverlap(player.rect(), {x:c.x-10, y:c.y-10, w:20, h:20})){
-          c.active = false; score += 20; updateHUD();
-        }
-      });
+    const player = new Player();
+    let platforms = [], enemies = [], items = [];
 
-      // 물약 충돌 (복구됨)
-      items.forEach(it => {
-        if(it.active && rectOverlap(player.rect(), it.rect())){
-          it.active = false; lives = Math.min(6, lives + 1); updateHUD();
-        }
-      });
+    function initStage() {
+      canvas.width = 800; canvas.height = 500;
+      platforms = [ {x:150, y:350, w:150, h:20}, {x:450, y:250, w:180, h:20}, {x:100, y:180, w:120, h:20} ];
+      items = [ new Item(215, 320, 'coin'), new Item(530, 220, 'coin'), new Item(150, 150, 'coin') ];
+      if(stage % 2 === 0) items.push(new Item(700, 410, 'potion'));
+      enemies = [ new Enemy(600, 410) ];
+      if(stage > 2) enemies.push(new Enemy(200, 320));
+      
+      msgEl.innerText = `STAGE ${stage}`; msgEl.style.opacity = 1;
+      setTimeout(() => msgEl.style.opacity = 0, 1500);
+    }
 
-      // 적 충돌
-      enemies.forEach((e, i) => {
-        if(!e.active) return;
-        e.update(dt);
+    function updateUI() {
+      scoreEl.innerText = `Score: ${score}`;
+      livesEl.innerText = '❤️'.repeat(Math.max(0, lives));
+      stageEl.innerText = `Stage: ${stage}`;
+    }
+
+    // 메인 루프 (프레임 고정 로직)
+    function loop(currentTime) {
+      requestAnimationFrame(loop);
+
+      const elapsed = currentTime - lastFrameTime;
+
+      // 16.66ms가 지나지 않았으면 실행하지 않고 건너뜀 (60FPS 제한)
+      if (elapsed < frameDelay) return;
+
+      // 실행 시점 보정
+      lastFrameTime = currentTime - (elapsed % frameDelay);
+
+      ctx.fillStyle = "#87ceeb"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#6b4f2d"; ctx.fillRect(0, canvas.height-60, canvas.width, 60);
+
+      if (!paused && !gameOver) {
+        player.update(platforms);
         
-        // 화면 밖 적 제거
-        if(e.x < -50 || e.x > canvas.width+50) e.active = false;
-
-        if(rectOverlap(player.rect(), {x:e.x, y:e.y, w:e.w, h:e.h})){
-          // 밟기 판정
-          if(player.vy > 0 && player.y + player.h < e.y + 18){
-            e.active = false;
-            player.vy = -10; // 밟고 점프
-            score += 50;
-            updateHUD();
-          } else if(Date.now() > player.invincibleUntil){
-            lives--;
-            player.invincibleUntil = Date.now() + 1000;
-            player.vy = -6; 
-            // 넉백
-            player.x += (player.x < e.x ? -1 : 1) * 20;
-            updateHUD();
-            if(lives <= 0) { gameOver = true; restartBtn.style.display = 'block'; }
+        items.forEach(it => {
+          if(it.active && player.x < it.x+it.w && player.x+player.w > it.x && player.y < it.y+it.h && player.y+player.h > it.y) {
+            it.active = false;
+            if(it.type==='coin') score += 20; else lives = Math.min(6, lives+1);
+            updateUI();
+            if(items.filter(i=>i.type==='coin' && i.active).length === 0) { stage++; initStage(); player.reset(); updateUI(); }
           }
-        }
-      });
+        });
 
-      // 스테이지 클리어
-      if(score >= stage * 150){
-        stage++;
-        layoutStage();
-        updateHUD();
+        enemies.forEach(e => {
+          if(!e.active) return; e.update();
+          if(player.x < e.x+e.w && player.x+player.w > e.x && player.y < e.y+e.h && player.y+player.h > e.y) {
+            if(player.vy > 0 && player.y + player.h < e.y + 15) { e.active=false; player.vy=-12; score+=50; updateUI(); }
+            else if(Date.now() > player.invincible) {
+              lives--; player.invincible = Date.now()+1000; player.vy=-8; updateUI();
+              if(lives <= 0) { gameOver=true; restartBtn.style.display='block'; }
+            }
+          }
+        });
       }
+
+      platforms.forEach(p => { ctx.fillStyle="#8b6b3c"; ctx.fillRect(p.x, p.y, p.w, p.h); ctx.fillStyle="#b98a4a"; ctx.fillRect(p.x, p.y, p.w, 5); });
+      items.forEach(i => i.draw());
+      enemies.forEach(e => e.draw());
+      player.draw();
+
+      if(paused) { ctx.fillStyle="rgba(0,0,0,0.5)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#fff"; ctx.font="30px sans-serif"; ctx.fillText("PAUSED", 350, 250); }
+      if(gameOver) { ctx.fillStyle="rgba(0,0,0,0.7)"; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle="#fff"; ctx.font="40px sans-serif"; ctx.fillText("GAME OVER", 300, 250); }
     }
 
-    // 그리기
-    platforms.forEach(p => p.draw());
-    coins.forEach(c => c.draw());
-    items.forEach(it => it.draw());
-    enemies.forEach(e => e.draw());
-    player.draw();
+    restartBtn.onclick = () => {
+      score=0; lives=4; stage=1; gameOver=false; player.reset(); initStage(); updateUI(); restartBtn.style.display='none';
+    };
 
-    if(paused) { 
-      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle = '#fff'; ctx.font = '30px sans-serif'; 
-      ctx.fillText("일시정지", canvas.width/2 - 60, canvas.height/2); 
-    }
-    if(gameOver) { 
-      ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-      ctx.fillStyle = '#fff'; ctx.font = '40px sans-serif'; 
-      ctx.fillText("Game Over", canvas.width/2 - 100, canvas.height/2 - 20); 
-    }
-
+    initStage();
+    updateUI();
     requestAnimationFrame(loop);
-  }
-
-  restartBtn.addEventListener('click', initGame);
-  initGame();
-  loop();
-
   </script>
 </body>
 </html>
